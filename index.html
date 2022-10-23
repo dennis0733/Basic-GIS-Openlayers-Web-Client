@@ -1,0 +1,359 @@
+<html lang="en"><head>
+    <title>Draw Features</title>
+    <link rel="stylesheet" href="https://openlayers.org/en/v6.4.3/css/ol.css" type="text/css">
+    <link rel="stylesheet" href=".\node_modules\sweetalert2\dist\sweetalert2.min.css" type="text/css">
+    <link rel="stylesheet" href=".\node_modules\jspanel4\dist\jspanel.css" type="text/css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/jq-3.6.0/dt-1.12.1/datatables.min.css"/>
+    
+    <script src=".\node_modules\jspanel4\dist\jspanel.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.4.3/build/ol.js"></script>
+    <script src=".\node_modules\jspanel4\dist/extensions/contextmenu/jspanel.contextmenu.js"></script>
+    <script type="module" src=".\node_modules\ol\geom.js"></script>
+    
+    <script src=".\node_modules\sweetalert2\dist\sweetalert2.js"></script>
+    <script src=".\node_modules\sweetalert2\dist\sweetalert2.all.min.js"></script>
+    
+    
+    <script
+      src="https://code.jquery.com/jquery-3.6.0.min.js"
+      integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4="
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.10.21/js/jquery.dataTables.min.js"
+      integrity="sha512-BkpSL20WETFylMrcirBahHfSnY++H2O1W+UnEEO4yNIl+jI2+zowyoGJpbtk6bx97fBXf++WJHSSK2MV4ghPcg=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+    <style>
+      html, body {
+        height: 100%;
+        width: 100%;
+        padding: 0px;
+        margin: 0px;
+      } 
+      .map {
+        height: 100%;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="type">
+      <button id="Point" value="Point">Add Location</button>
+      <button id="Edit" value="Edit">Query Locations</button>
+      
+    </div>
+    <div id="map" class="map">
+        
+    
+<script>
+
+const features = [];
+
+async function drawings(){
+const res = await fetch('http://localhost:5046/GetAll')
+  const data = await res.json();
+  for (i = 0; i < data.length; i++){
+
+    features.push( new ol.Feature({
+          id: data[0].id,
+          geometry: new ol.geom.Point(ol.proj.fromLonLat([data[i].x, data[i].y]))
+
+        }))
+
+        
+
+        
+  }
+
+  source.addFeatures(features);
+}
+
+    drawings();
+
+  
+
+  var raster = new ol.layer.Tile({ // TileLayer({
+    source: new ol.source.OSM(),
+  });
+
+  var source = new ol.source.Vector({         // VectorSource({
+    
+    wrapX: false
+  });
+  
+  var myStyle = new ol.style.Style({
+      image: new ol.style.Circle({
+        radius: 3,
+        fill: new ol.style.Fill({color: 'red'}),
+        stroke: new ol.style.Stroke({
+          color: [255,0,0], width: 1
+        })
+      })
+    });
+
+  var vector = new ol.layer.Vector({ // VectorLayer({
+    source: source,
+    style: myStyle,
+  });
+
+  
+
+
+  var map = new ol.Map({
+    layers: [raster, vector],
+    target: 'map',
+    view: new ol.View({
+      center: ol.proj.fromLonLat([35.36, 38.84]),
+      zoom: 7.1,
+    }),
+  });
+
+  
+  
+  var typeSelect = document.getElementById('type');
+
+  let draw; // global so we can remove it later
+  function addInteraction(element) {
+    var value = element.value;
+    if (value !== 'None') {
+      draw = new ol.interaction.Draw({
+        source: source,
+        type: value,
+      });
+      map.addInteraction(draw);
+    }
+ }
+ 
+
+
+
+/////////////////////////DELETE
+function deletefnc(id){
+
+
+let opt ="http://localhost:5046/Delete?id="+ id;
+
+fetch(opt,{method:"DELETE"})
+.then(
+  (res)=> {
+    if(!res.ok){
+      Swal.fire({
+    html: "<b>Unsuccessfull Delete Operation",
+    icon: "error",
+    timer: 2500,
+  })
+  return;
+    }
+  }
+)
+
+.then(
+    Swal.fire({
+      html: "Delete Operation Successfull",
+      icon: "success",
+      timer: 2500,
+
+    })
+  )
+
+}
+///////////////////////////////////
+
+
+/////////////////////////////POST
+ function postfnc(name,x,y){
+
+  if(name.length < 3){
+    Swal.fire({
+    html: "<b>Unsuccessfull Post Operation",
+    icon: "error",
+    timer: 2500,
+  })
+  return;  
+  }
+  
+  let name_=name;
+  let x_=x;
+  let y_=y;  
+
+  let opt="http://localhost:5046/Add?Name="+ name_ + "&X=" + x_ +"&Y=" + y_;
+  
+  
+
+  
+
+ fetch(opt,{
+ method:"POST",
+ })
+
+  .then(
+    (res) => {
+      if(res.ok){
+      return res.text();
+  }
+
+})
+
+  .then(
+    Swal.fire({
+      html: "Add Operation Successfull",
+      icon: "success",
+      timer: 2500,
+
+    })
+  )
+
+  
+ }
+ ///////////////////////////////////////////////////////////
+ 
+
+
+ //////////////////////////////////////////////////EDIT
+ var select = new ol.interaction.Select();
+ const translate = new ol.interaction.Translate({
+  features: select.getFeatures(),
+});
+
+function editfnc(){
+
+
+
+translate.on('add', function(e){
+  //source is layer.getSource()
+  var coord = e.element.getGeometry().getCoordinates();
+  let coords =ol.proj.transform(coord, "EPSG:3857", "EPSG:4326");
+
+  console.log(coords);
+});
+map.addInteraction(select);
+map.addInteraction(translate);
+
+    
+
+}
+
+
+ //////////////////////////////////////////////
+ 
+
+ async function BtnClick(){
+  
+
+
+let cnt = '';
+
+  
+  const response = await fetch('http://localhost:5046/GetAll')
+  const data = await response.json();
+  for (i = 0; i < data.length; i++){
+         cnt+='<h style="color:black;">Name: </h>'+ data[i].name+' <h style="color:black;">X: </h>'+data[i].x+' <h style="color:black;">Y: </h>'+data[i].y + '<button type ="button" onclick=deletefnc('+data[i].id +')> Delete</button>' +'<br>'
+         
+  }
+  
+  
+
+  
+  
+  var jspanel = jsPanel.create({
+      theme: 'default',  
+      headerTitle: 'Query Locations',
+        id:"js-editpanel",
+        addCloseControl: true,
+        headerControls: 'none',
+
+        panelSize: {
+        width: () => { return Math.min(600, window.innerWidth*0.9);},
+        height: () => { return Math.min(120, window.innerHeight*0.6);}
+    },
+        
+        content: cnt + '<button id="close"> Close </button>',
+        contentSize: "auto",
+        borderRadius: ".10rem"
+        
+      });
+
+      jspanel.setTheme({
+    bgPanel: 'linear-gradient(120deg,#155799,#159957)',
+    bgContent: 'rgba(255, 255, 255, 0.15)',
+    colorHeader: '#fff',
+    colorContent: '#fff',
+    border: 'medium solid #157B75'
+});
+
+document.getElementById("close").addEventListener('click',() => jspanel.close());
+
+ }
+
+ 
+
+  /**
+   * Handle button clicks.
+   */
+  function handleBtnClick() {
+    var element=this;
+    addInteraction(element);
+    
+    draw.on("drawend",function(e){
+      
+    
+      var feature = e.feature;
+      var coord = feature.getGeometry().getCoordinates();
+      let coords =ol.proj.transform(coord, "EPSG:3857", "EPSG:4326");
+      draw.setActive(false);
+      
+      let el = "<h>x:" + coords[0] + "</h><br><h>y:" + coords[1] + "</h><br>" + '<label for="locname">Location Name</label>' + '<input type="text" id="locname"><br>' + '<button type ="button" onclick="postfnc(locname.value,'+ coords[0] + "," + coords[1] +')"> Add</button>';
+      
+      
+
+     var jspanel = jsPanel.create({
+      theme: 'primary',  
+      headerTitle: 'Add Location',
+        id:"js-panel",
+        addCloseControl: true,
+        headerControls: 'none',
+
+        panelSize: {
+        width: () => { return Math.min(300, window.innerWidth*0.9);},
+        height: () => { return Math.min(120, window.innerHeight*0.6);}
+    },
+        
+        content: el + '<button id="close"> Close </button>',
+        contentSize: "auto",
+        borderRadius: ".10rem"
+        
+      });
+      jspanel.setTheme({
+    bgPanel: 'linear-gradient(120deg,#155799,#159957)',
+    bgContent: 'rgba(255, 255, 255, 0.15)',
+    colorHeader: '#fff',
+    colorContent: '#fff',
+    border: 'medium solid #157B75'
+});
+
+
+document.getElementById("close").addEventListener('click',() => jspanel.close());
+
+         
+    })
+    
+    
+    
+  };
+
+
+  document.getElementById("Point").addEventListener('click', handleBtnClick);
+  document.getElementById("Edit").addEventListener('click', BtnClick);
+  
+
+
+
+    </script>
+
+  
+    
+</body>
+
+</html>
